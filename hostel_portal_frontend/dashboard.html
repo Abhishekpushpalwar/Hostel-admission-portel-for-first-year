@@ -1,0 +1,107 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-card">
+            <h1>Student Dashboard</h1>
+            <p>Welcome, <strong id="studentName"></strong></p>
+            <p>CAP ID: <span id="studentCapId"></span></p>
+            <p>State Rank: <span id="studentRank"></span></p>
+
+            <button class="login-button" id="logoutButton">
+                Logout
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const name = sessionStorage.getItem("studentName");
+
+        if (!name) {
+            window.location.replace("index.html");
+        } else {
+            document.getElementById("studentName").textContent = name;
+            document.getElementById("studentCapId").textContent =
+                sessionStorage.getItem("studentCapId");
+            document.getElementById("studentRank").textContent =
+                sessionStorage.getItem("studentStateRank");
+        }
+
+        document.getElementById("logoutButton").addEventListener("click", function () {
+            sessionStorage.clear();
+            window.location.href = "index.html";
+        });
+        
+ 
+</script>
+
+<section id="studentProfile">
+  Loading your student profile...
+</section>
+
+<script>
+  const token = sessionStorage.getItem("hostelPortalToken");
+  const profile = document.getElementById("studentProfile");
+
+  if (!token) {
+    window.location.replace("student-login.html");
+  } else {
+    fetch("http://localhost:4000/me", {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    })
+      .then(async response => {
+        if (response.status === 401) {
+          sessionStorage.removeItem("hostelPortalToken");
+          window.location.replace("student-login.html");
+          return null;
+        }
+
+        if (!response.ok) {
+          throw new Error("Unable to load student profile.");
+        }
+
+        return response.json();
+      })
+      .then(student => {
+        if (!student) return;
+
+        profile.replaceChildren();
+
+        const heading = document.createElement("h2");
+        heading.textContent = "Welcome, " + (student.full_name || "Student");
+
+        const details = [
+          ["CAP ID", student.cap_id],
+          ["Roll Number", student.roll_no],
+          ["Email", student.email],
+          ["Branch", student.branch],
+          ["Category", student.category],
+          ["CGPA", student.cgpa]
+        ];
+
+        profile.appendChild(heading);
+
+        details.forEach(([label, value]) => {
+          const p = document.createElement("p");
+          p.textContent = `${label}: ${value ?? "Not available"}`;
+          profile.appendChild(p);
+        });
+      })
+      .catch(error => {
+        profile.textContent = error.message;
+      });
+  }
+</script>
+
+
+</body>
+</html>

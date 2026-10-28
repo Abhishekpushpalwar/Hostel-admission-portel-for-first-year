@@ -1,0 +1,72 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Login - Hostel Admission</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="script.js" defer></script>
+</head>
+<body>
+
+    <div class="login-container">
+        <div class="login-card">
+            <h1>Student Login</h1>
+            <p class="subtitle">Hostel Admission Portal</p>
+
+            <form id="loginForm">
+                <label for="capId">CAP ID Number</label>
+                <input
+                    type="text"
+                    id="capId"
+                    placeholder="Enter your CAP ID"
+                    required
+                >
+
+                <label for="stateRank">State Rank</label>
+                <input
+                    type="number"
+                    id="stateRank"
+                    placeholder="Enter your state rank"
+                    min="1"
+                    required
+                >
+
+                <label>CAPTCHA Verification</label>
+                <div class="captcha-row">
+                    <span id="captchaText"></span>
+                    <button type="button" id="refreshCaptcha"
+                        class="refresh-button">Refresh</button>
+                </div>
+
+                <input
+                    type="text"
+                    id="captchaInput"
+                    placeholder="Enter the CAPTCHA"
+                    autocomplete="off"
+                    required
+                >
+
+                <label class="remember">
+                    <input type="checkbox" id="rememberMe">
+                    Remember my CAP ID
+                </label>
+
+                <button type="submit" class="login-button">
+                    Sign In
+                </button>
+
+                <p id="message" role="status" aria-live="polite"></p>
+            </form>
+
+            <!-- <div class="demo-info">
+                <strong>Demo accounts</strong>
+                <p>CAP1001 / Rank 120</p>
+                <p>CAP1002 / Rank 250</p>
+            </div> -->
+        </div>
+    </div>
+
+</body>
+</html>

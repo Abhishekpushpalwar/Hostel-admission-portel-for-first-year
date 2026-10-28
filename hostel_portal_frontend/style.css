@@ -1,0 +1,131 @@
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: linear-gradient(135deg, #e8f0ff, #f4f7fb);
+    color: #182238;
+    min-height: 100vh;
+}
+
+.login-container {
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 24px;
+}
+
+.login-card {
+    width: 100%;
+    max-width: 420px;
+    background: white;
+    padding: 32px;
+    border-radius: 16px;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.10);
+}
+
+h1 {
+    text-align: center;
+    margin: 0 0 8px;
+    color: #2349a3;
+}
+
+.subtitle {
+    text-align: center;
+    color: #6b7280;
+    margin-bottom: 28px;
+}
+
+form > label:not(.remember) {
+    display: block;
+    font-weight: bold;
+    margin: 16px 0 7px;
+}
+
+input[type="text"],
+input[type="number"] {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 7px;
+    font-size: 15px;
+}
+
+input:focus {
+    outline: 2px solid #93b4ff;
+    border-color: #315dcc;
+}
+
+.captcha-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+#captchaText {
+    flex: 1;
+    padding: 12px;
+    text-align: center;
+    background: #e3ebfa;
+    color: #2349a3;
+    font-size: 24px;
+    font-weight: bold;
+    letter-spacing: 6px;
+    border-radius: 7px;
+    user-select: none;
+}
+
+button {
+    cursor: pointer;
+    border: none;
+    border-radius: 7px;
+    padding: 11px 14px;
+}
+
+.refresh-button {
+    background: #e8edf7;
+    color: #2349a3;
+}
+
+.remember {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 18px 0;
+    font-size: 14px;
+}
+
+.login-button {
+    width: 100%;
+    background: #315dcc;
+    color: white;
+    font-size: 16px;
+    font-weight: bold;
+}
+
+.login-button:hover {
+    background: #2349a3;
+}
+
+#message {
+    font-size: 14px;
+    text-align: center;
+    margin-bottom: 0;
+}
+
+.demo-info {
+    margin-top: 25px;
+    padding: 14px;
+    background: #f1f5fb;
+    border-radius: 8px;
+    font-size: 13px;
+}
+
+.demo-info p {
+    margin: 7px 0 0;
+}

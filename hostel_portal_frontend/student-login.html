@@ -1,0 +1,172 @@
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hostel Portal | Student Login</title>
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background: #f1f5f9;
+      font-family: Arial, sans-serif;
+      color: #172033;
+    }
+
+    .card {
+      width: min(92%, 420px);
+      background: white;
+      padding: 30px;
+      border-radius: 16px;
+      box-shadow: 0 8px 30px #00000012;
+    }
+
+    h1 { margin-top: 0; font-size: 25px; }
+    p { color: #64748b; line-height: 1.5; }
+
+    label {
+      display: block;
+      margin: 18px 0 7px;
+      font-weight: 600;
+    }
+
+    input {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      font-size: 16px;
+    }
+
+    button {
+      width: 100%;
+      padding: 12px;
+      margin-top: 18px;
+      border: 0;
+      border-radius: 8px;
+      background: #1d4ed8;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    button:disabled { opacity: .6; cursor: wait; }
+    #message { margin-top: 16px; font-size: 14px; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <h1>Student Login</h1>
+    <p>Sign in to the Hostel Admission Portal using your CAP ID and registered email OTP.</p>
+
+    <form id="capForm">
+      <label for="capId">CAP ID</label>
+      <input id="capId" name="capId" required maxlength="100"
+             autocomplete="username" placeholder="Enter your CAP ID">
+      <button id="requestButton" type="submit">Send OTP</button>
+    </form>
+
+    <form id="otpForm" class="hidden">
+      <label for="otp">6-digit email OTP</label>
+      <input id="otp" name="otp" required inputmode="numeric"
+             pattern="[0-9]{6}" maxlength="6" placeholder="Enter OTP">
+      <button id="verifyButton" type="submit">Verify OTP and Login</button>
+      <button id="backButton" type="button"
+              style="background:#64748b">Back</button>
+    </form>
+
+    <p id="message" role="status" aria-live="polite"></p>
+  </main>
+
+  <script>
+    const API = "http://localhost:4000";
+    const capForm = document.getElementById("capForm");
+    const otpForm = document.getElementById("otpForm");
+    const capInput = document.getElementById("capId");
+    const otpInput = document.getElementById("otp");
+    const message = document.getElementById("message");
+
+    function showMessage(text) {
+      message.textContent = text;
+    }
+
+    async function post(path, body) {
+      const response = await fetch(API + path, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(data.error || data.message || "Request failed.");
+      }
+      return data;
+    }
+
+    capForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+
+      const button = document.getElementById("requestButton");
+      button.disabled = true;
+      showMessage("Requesting OTP...");
+
+      try {
+        const data = await post("/auth/request-otp", {
+          capId: capInput.value.trim()
+        });
+
+        capForm.classList.add("hidden");
+        otpForm.classList.remove("hidden");
+        showMessage(data.message || "If your account is eligible, an OTP will be sent to its registered email.");
+        otpInput.focus();
+      } catch (error) {
+        showMessage(error.message);
+      } finally {
+        button.disabled = false;
+      }
+    });
+
+    otpForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+
+      const button = document.getElementById("verifyButton");
+      button.disabled = true;
+      showMessage("Verifying OTP...");
+
+      try {
+        const data = await post("/auth/verify-otp", {
+          capId: capInput.value.trim(),
+          token: otpInput.value.trim()
+        });
+
+        if (!data.token) {
+          throw new Error("Login token was not returned.");
+        }
+
+        sessionStorage.setItem("hostelPortalToken", data.token);
+        window.location.href = "dashboard.html";
+      } catch (error) {
+        showMessage(error.message);
+      } finally {
+        button.disabled = false;
+      }
+    });
+
+    document.getElementById("backButton").addEventListener("click", () => {
+      otpForm.classList.add("hidden");
+      capForm.classList.remove("hidden");
+      otpInput.value = "";
+      showMessage("");
+    });
+  </script>
+</body>
+</html>
+```
