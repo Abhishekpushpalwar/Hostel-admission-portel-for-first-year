@@ -16,5 +16,5 @@ export const config = {
   supabaseKey: process.env.SUPABASE_SERVICE_KEY || '',
   bucket: process.env.STORAGE_BUCKET || 'documents',
   supabaseAnonKey: need('SUPABASE_ANON_KEY'),
-  
+  supabaseServiceRoleKey: need('SUPABASE_SERVICE_ROLE_KEY'),
 };

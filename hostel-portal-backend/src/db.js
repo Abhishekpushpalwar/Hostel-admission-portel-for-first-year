@@ -24,3 +24,6 @@ export async function tx(fn) {
     client.release();
   }
 }
+pool.query('SELECT NOW()')
+  .then(r => console.log('DB connected:', r.rows[0]))
+  .catch(e => console.error('DB error:', e.message));
