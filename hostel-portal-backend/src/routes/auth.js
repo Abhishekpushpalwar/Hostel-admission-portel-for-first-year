@@ -212,6 +212,8 @@ const registerLimiter = rateLimit({
 });
 
 // POST /auth/register  (public, creates an unverified student)
+
+// POST /auth/register  (public, creates an unverified student)
 router.post(
   '/auth/register',
   registerLimiter,
@@ -224,6 +226,7 @@ router.post(
       branch: z.string().trim().min(1).max(100),
       category: z.string().trim().min(1).max(50),
       distanceKm: z.coerce.number().int().min(0).max(5000),
+      stateRank: z.coerce.number().int().min(1).max(10000000),
       cgpa: z.coerce.number().min(0).max(10).optional(),
       cetPercentile: z.coerce.number().min(0).max(100).optional()
     }).parse(req.body);
@@ -233,7 +236,6 @@ router.post(
     const rollNo = b.rollNo ?? `PENDING-${b.capId}`;
 
     try {
-      // One statement, so either both rows are created or neither.
       await query(
         `WITH u AS (
            INSERT INTO users (id, email, password_hash, role)
@@ -242,14 +244,17 @@ router.post(
          )
          INSERT INTO students
            (user_id, roll_no, full_name, branch, category, cgpa,
-            cet_percentile, distance_km, cap_id, admin_verified)
-         SELECT id, $3, $4, $5, $6, $7, $8, $9, $10, FALSE FROM u`,
+            cet_percentile, distance_km, cap_id, state_rank, admin_verified)
+         SELECT id, $3, $4, $5, $6, $7, $8, $9, $10, $11, FALSE FROM u`,
         [b.email, unusableHash, rollNo, b.fullName, b.branch, b.category,
-         b.cgpa ?? null, b.cetPercentile ?? null, b.distanceKm, b.capId]
+         b.cgpa ?? null, b.cetPercentile ?? null, b.distanceKm, b.capId, b.stateRank]
       );
     } catch (err) {
       if (err.code === '23505') {
         throw new HttpError(409, 'This CAP ID, email or roll number is already registered');
+      }
+      if (err.code === '23514') {
+        throw new HttpError(400, 'One of the values is not allowed (check category)');
       }
       throw err;
     }
@@ -259,7 +264,6 @@ router.post(
     });
   })
 );
-
 // GET /admin/students?status=pending|verified
 router.get(
   '/admin/students',

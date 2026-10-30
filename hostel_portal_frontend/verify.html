@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hostel Portal | Document verification</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: Arial, sans-serif; background: #f1f5f9; color: #172033; }
+    header { background: #1d4ed8; color: white; padding: 14px 24px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    header h1 { font-size: 20px; margin: 0; }
+    header a { color: white; margin-right: 16px; font-size: 14px; }
+    main { max-width: 1100px; margin: 24px auto; padding: 0 16px; }
+    .card { background: white; padding: 24px; border-radius: 16px; box-shadow: 0 8px 30px #00000012; }
+    button { padding: 8px 14px; border: 0; border-radius: 8px; background: #1d4ed8; color: white; font-size: 14px; cursor: pointer; }
+    button.green { background: #15803d; }
+    button.red { background: #b91c1c; }
+    button.grey { background: #64748b; }
+    button:disabled { opacity: .6; cursor: wait; }
+    .tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+    .tabs button.active { background: #172033; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid #e2e8f0; vertical-align: middle; }
+    th { color: #64748b; font-weight: 600; }
+    .wrap { overflow-x: auto; }
+    .actions { display: flex; gap: 6px; flex-wrap: wrap; }
+    #message { margin: 12px 0; font-size: 14px; min-height: 18px; }
+    .ok { color: #15803d; }
+    .err { color: #b91c1c; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Document verification</h1>
+    <div><a href="admin.html">Students</a><button id="logoutBtn" class="grey">Log out</button></div>
+  </header>
+
+  <main>
+    <div class="card">
+      <div class="tabs">
+        <button id="tab-pending" class="active">Pending</button>
+        <button id="tab-flagged">Flagged</button>
+        <button id="tab-verified">Verified</button>
+      </div>
+      <p id="message" role="status"></p>
+      <div class="wrap">
+        <table>
+          <thead>
+            <tr><th>CAP ID</th><th>Student</th><th>Document</th><th>Uploaded</th><th>Remark</th><th></th></tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const API = "http://localhost:4000";
+    const KEY = "hostelAdminToken"; // same token admin.html saves
+    const token = sessionStorage.getItem(KEY);
+    if (!token) window.location.href = "admin.html";
+
+    const LABELS = {
+      marksheet_10: "10th marksheet",
+      marksheet_12: "12th marksheet",
+      distance_certificate: "Distance certificate",
+      category_certificate: "Category certificate"
+    };
+    let status = "pending";
+    const $ = (id) => document.getElementById(id);
+
+    function say(text, ok) {
+      $("message").textContent = text;
+      $("message").className = ok ? "ok" : "err";
+    }
+
+    function logout() {
+      sessionStorage.removeItem(KEY);
+      window.location.href = "admin.html";
+    }
+
+    async function api(path, options = {}) {
+      const res = await fetch(API + path, {
+        ...options,
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer " + token,
+          ...(options.headers || {})
+        }
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 401 || res.status === 403) { logout(); throw new Error("Session expired."); }
+      if (!res.ok) throw new Error(data.error || "Request failed.");
+      return data;
+    }
+
+    function cell(text) {
+      const td = document.createElement("td");
+      td.textContent = text ?? "";
+      return td;
+    }
+
+    function button(label, cls, handler) {
+      const b = document.createElement("button");
+      b.className = cls;
+      b.textContent = label;
+      b.addEventListener("click", () => handler(b));
+      return b;
+    }
+
+    async function load() {
+      say("Loading...", true);
+      try {
+        const docs = await api("/admin/documents?status=" + status);
+        const tbody = $("rows");
+        tbody.replaceChildren();
+
+        docs.forEach((d) => {
+          const tr = document.createElement("tr");
+          tr.append(
+            cell(d.cap_id),
+            cell(d.full_name),
+            cell(LABELS[d.doc_type] || d.doc_type),
+            cell(new Date(d.uploaded_at).toLocaleString()),
+            cell(d.remark || "")
+          );
+          const td = document.createElement("td");
+          const box = document.createElement("div");
+          box.className = "actions";
+          box.append(button("View", "grey", () => view(d.id)));
+          if (status !== "verified") box.append(button("Approve", "green", (b) => approve(d, b)));
+          if (status === "pending") box.append(button("Flag", "red", (b) => flag(d, b)));
+          td.append(box);
+          tr.append(td);
+          tbody.append(tr);
+        });
+        say(docs.length ? "" : "Nothing here.", true);
+      } catch (e) { say(e.message, false); }
+    }
+
+    // Open the tab first so the popup blocker allows it, then point it at the 60-second link.
+    async function view(id) {
+      const tab = window.open("", "_blank");
+      try {
+        const d = await api("/documents/" + id + "/link");
+        tab.location.href = d.url;
+      } catch (e) {
+        if (tab) tab.close();
+        say(e.message, false);
+      }
+    }
+
+    async function approve(d, b) {
+      if (!confirm("Approve " + (LABELS[d.doc_type] || d.doc_type) + " of " + d.full_name + "?")) return;
+      b.disabled = true;
+      try {
+        await api("/admin/documents/" + d.id + "/approve", { method: "POST" });
+        say("Approved.", true);
+        load();
+      } catch (e) { say(e.message, false); b.disabled = false; }
+    }
+
+    async function flag(d, b) {
+      const remark = (prompt("Why is this document being flagged? (the student will see this)") || "").trim();
+      if (!remark) return say("A remark is required to flag a document.", false);
+      b.disabled = true;
+      try {
+        await api("/admin/documents/" + d.id + "/flag", { method: "POST", body: JSON.stringify({ remark }) });
+        say("Flagged. The student can upload it again.", true);
+        load();
+      } catch (e) { say(e.message, false); b.disabled = false; }
+    }
+
+    ["pending", "flagged", "verified"].forEach((s) => {
+      $("tab-" + s).addEventListener("click", () => {
+        status = s;
+        ["pending", "flagged", "verified"].forEach((t) => $("tab-" + t).classList.toggle("active", t === s));
+        load();
+      });
+    });
+    $("logoutBtn").addEventListener("click", logout);
+
+    load();
+  </script>
+</body>
+</html>

@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hostel Portal | Admin</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: Arial, sans-serif; background: #f1f5f9; color: #172033; }
+    header { background: #1d4ed8; color: white; padding: 14px 24px; display: flex; justify-content: space-between; align-items: center; }
+    header h1 { font-size: 20px; margin: 0; }
+    main { max-width: 1100px; margin: 24px auto; padding: 0 16px; }
+    .card { background: white; padding: 24px; border-radius: 16px; box-shadow: 0 8px 30px #00000012; }
+    .login { max-width: 380px; margin: 60px auto; }
+    label { display: block; margin: 14px 0 6px; font-weight: 600; }
+    input { width: 100%; padding: 11px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 15px; }
+    button { padding: 10px 16px; border: 0; border-radius: 8px; background: #1d4ed8; color: white; font-size: 14px; cursor: pointer; }
+    button.full { width: 100%; margin-top: 18px; padding: 12px; font-size: 16px; }
+    button.green { background: #15803d; }
+    button.grey { background: #64748b; }
+    button:disabled { opacity: .6; cursor: wait; }
+    .tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+    .tabs button.active { background: #172033; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid #e2e8f0; }
+    th { color: #64748b; font-weight: 600; }
+    .wrap { overflow-x: auto; }
+    #message { margin: 12px 0; font-size: 14px; }
+    .ok { color: #15803d; }
+    .err { color: #b91c1c; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <section id="loginView" class="card login">
+    <h2 style="margin-top:0">Admin login</h2>
+    <form id="loginForm">
+      <label for="email">Email</label>
+      <input id="email" type="email" required autocomplete="username">
+      <label for="password">Password</label>
+      <input id="password" type="password" required autocomplete="current-password">
+      <button class="full" type="submit">Log in</button>
+    </form>
+    <p id="loginMsg" class="err"></p>
+  </section>
+
+  <section id="appView" class="hidden">
+    <header>
+      <h1>Hostel Portal: Student verification</h1>
+      <button id="logoutBtn" class="grey">Log out</button>
+      <a href="verify.html" style="color:white;margin-right:16px;font-size:14px">Documents</a>
+    </header>
+    <main>
+      <div class="card">
+        <div class="tabs">
+          <button id="tabPending" class="active">Pending</button>
+          <button id="tabVerified">Verified</button>
+        </div>
+        <p id="message" role="status"></p>
+        <div class="wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>CAP ID</th><th>Name</th><th>Email</th><th>Branch</th>
+                <th>Category</th><th>State rank</th><th>Distance (km)</th><th></th>
+              </tr>
+            </thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </section>
+
+  <script>
+    const API = "http://localhost:4000";
+    const KEY = "hostelAdminToken";
+    let status = "pending";
+
+    const $ = (id) => document.getElementById(id);
+
+    function show(text, ok) {
+      $("message").textContent = text;
+      $("message").className = ok ? "ok" : "err";
+    }
+
+    function token() { return sessionStorage.getItem(KEY); }
+
+    async function api(path, options = {}) {
+      const res = await fetch(API + path, {
+        ...options,
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer " + token(),
+          ...(options.headers || {})
+        }
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 401 || res.status === 403) {
+        logout();
+        throw new Error("Session expired. Please log in again.");
+      }
+      if (!res.ok) throw new Error(data.error || "Request failed.");
+      return data;
+    }
+
+    function setView(loggedIn) {
+      $("loginView").classList.toggle("hidden", loggedIn);
+      $("appView").classList.toggle("hidden", !loggedIn);
+    }
+
+    function logout() {
+      sessionStorage.removeItem(KEY);
+      setView(false);
+    }
+
+    function cell(text) {
+      const td = document.createElement("td");
+      td.textContent = text ?? "";
+      return td;
+    }
+
+    async function load() {
+      show("Loading...", true);
+      try {
+        const list = await api("/admin/students?status=" + status);
+        const tbody = $("rows");
+        tbody.replaceChildren();
+
+        list.forEach((s) => {
+          const tr = document.createElement("tr");
+          [s.cap_id, s.full_name, s.email, s.branch, s.category,
+           s.state_rank, s.distance_km].forEach((v) => tr.appendChild(cell(v)));
+
+          const td = document.createElement("td");
+          if (status === "pending") {
+            const b = document.createElement("button");
+            b.className = "green";
+            b.textContent = "Approve";
+            b.addEventListener("click", () => approve(s, b));
+            td.appendChild(b);
+          }
+          tr.appendChild(td);
+          tbody.appendChild(tr);
+        });
+
+        show(list.length ? "" : "No students in this list.", true);
+      } catch (e) {
+        show(e.message, false);
+      }
+    }
+
+    async function approve(student, button) {
+      if (!confirm("Approve " + student.full_name + " (" + student.cap_id + ")?")) return;
+      button.disabled = true;
+      try {
+        await api("/admin/students/" + student.user_id + "/approve", { method: "POST" });
+        show(student.full_name + " approved. They can log in now.", true);
+        load();
+      } catch (e) {
+        show(e.message, false);
+        button.disabled = false;
+      }
+    }
+
+    function setTab(next) {
+      status = next;
+      $("tabPending").classList.toggle("active", next === "pending");
+      $("tabVerified").classList.toggle("active", next === "verified");
+      load();
+    }
+
+    $("tabPending").addEventListener("click", () => setTab("pending"));
+    $("tabVerified").addEventListener("click", () => setTab("verified"));
+    $("logoutBtn").addEventListener("click", logout);
+
+    $("loginForm").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      $("loginMsg").textContent = "";
+      try {
+        const res = await fetch(API + "/auth/admin-login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: $("email").value.trim(),
+            password: $("password").value
+          })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || "Login failed.");
+        sessionStorage.setItem(KEY, data.token);
+        $("password").value = "";
+        setView(true);
+        load();
+      } catch (e) {
+        $("loginMsg").textContent = e.message;
+      }
+    });
+
+    if (token()) { setView(true); load(); } else { setView(false); }
+  </script>
+</body>
+</html>

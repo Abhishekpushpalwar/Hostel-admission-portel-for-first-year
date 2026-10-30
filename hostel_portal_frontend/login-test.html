@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Login test</title></head>
+<body style="font-family:sans-serif;max-width:360px;margin:40px auto">
+  <h3>Student login</h3>
+  <div id="step1">
+    <input id="capId" placeholder="CAP ID" style="width:100%;padding:8px">
+    <button onclick="requestOtp()" style="margin-top:8px">Send OTP</button>
+  </div>
+  <div id="step2" style="display:none">
+    <input id="otp" placeholder="Code from email" inputmode="numeric" style="width:100%;padding:8px">
+    <button onclick="verifyOtp()" style="margin-top:8px">Verify</button>
+  </div>
+  <p id="msg"></p>
+
+<script>
+const API = 'http://localhost:4000';
+const msg = (t) => document.getElementById('msg').textContent = t;
+
+async function post(path, body) {
+  const res = await fetch(API + path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'Request failed');
+  return data;
+}
+
+async function requestOtp() {
+  try {
+    const capId = document.getElementById('capId').value.trim();
+    const d = await post('/auth/request-otp', { capId });
+    msg(d.message);
+    document.getElementById('step2').style.display = 'block';
+  } catch (e) { msg(e.message); }
+}
+
+async function verifyOtp() {
+  try {
+    const capId = document.getElementById('capId').value.trim();
+    const token = document.getElementById('otp').value.trim();
+    const d = await post('/auth/verify-otp', { capId, token });
+    localStorage.setItem('token', d.token);
+    msg('Logged in as ' + d.role);
+    const me = await fetch(API + '/me', { headers: { Authorization: 'Bearer ' + d.token } });
+    console.log('me:', await me.json());
+  } catch (e) { msg(e.message); }
+}
+</script>
+</body>
+</html>

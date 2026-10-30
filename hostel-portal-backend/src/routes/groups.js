@@ -187,5 +187,14 @@ router.put('/groups/:id/preferences', wrap(async (req, res) => {
   });
   res.json({ room_ids, locked: submit });
 }));
+// GET /rounds/open   (student) the currently open round(s), so the portal knows the round id
+router.get('/rounds/open', requireAuth, requireRole('student'), wrap(async (_req, res) => {
+  const { rows } = await query(
+    `select id, status from allotment_rounds
+      where academic_year = $1 and status = 'open' order by id`,
+    [config.academicYear]
+  );
+  res.json(rows);
+}));
 
 export default router;

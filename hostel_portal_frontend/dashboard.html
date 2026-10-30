@@ -1,107 +1,345 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Student Dashboard</title>
-    <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hostel Portal | Dashboard</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: Arial, sans-serif; background: #f1f5f9; color: #172033; }
+    header { background: #1d4ed8; color: white; padding: 14px 24px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    header h1 { font-size: 20px; margin: 0; }
+    main { max-width: 900px; margin: 24px auto; padding: 0 16px; display: grid; gap: 20px; }
+    .card { background: white; padding: 24px; border-radius: 16px; box-shadow: 0 8px 30px #00000012; }
+    h2 { margin-top: 0; font-size: 20px; }
+    h3 { font-size: 16px; margin: 20px 0 8px; }
+    label { display: block; margin: 12px 0 6px; font-weight: 600; font-size: 14px; }
+    input, select { width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 15px; background: white; }
+    button { padding: 10px 16px; border: 0; border-radius: 8px; background: #1d4ed8; color: white; font-size: 14px; cursor: pointer; }
+    button.green { background: #15803d; }
+    button.grey { background: #64748b; }
+    button.red { background: #b91c1c; }
+    button:disabled { opacity: .6; cursor: wait; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 8px; }
+    th, td { text-align: left; padding: 9px 8px; border-bottom: 1px solid #e2e8f0; }
+    th { color: #64748b; font-weight: 600; }
+    .wrap { overflow-x: auto; }
+    .row { display: flex; gap: 10px; align-items: end; flex-wrap: wrap; }
+    .row > div { flex: 1; min-width: 180px; }
+    .msg { font-size: 14px; margin: 10px 0; min-height: 18px; }
+    .ok { color: #15803d; }
+    .err { color: #b91c1c; }
+    .muted { color: #64748b; font-size: 14px; }
+    .badge { padding: 2px 8px; border-radius: 99px; font-size: 12px; background: #e2e8f0; }
+    .badge.verified, .badge.accepted { background: #dcfce7; color: #166534; }
+    .badge.flagged, .badge.declined { background: #fee2e2; color: #991b1b; }
+    .badge.pending, .badge.invited { background: #fef9c3; color: #854d0e; }
+    .group { border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; margin-top: 12px; }
+  </style>
 </head>
 <body>
-    <div class="login-container">
-        <div class="login-card">
-            <h1>Student Dashboard</h1>
-            <p>Welcome, <strong id="studentName"></strong></p>
-            <p>CAP ID: <span id="studentCapId"></span></p>
-            <p>State Rank: <span id="studentRank"></span></p>
-
-            <button class="login-button" id="logoutButton">
-                Logout
-            </button>
-        </div>
+  <header>
+    <h1>Hostel Admission Portal</h1>
+    <div style="display:flex;gap:12px;align-items:center">
+      <span id="who"></span>
+      <button id="logoutBtn" class="grey">Log out</button>
     </div>
+  </header>
 
-    <script>
-        const name = sessionStorage.getItem("studentName");
+  <main>
+    <section class="card">
+      <h2>My documents</h2>
+      <p class="muted">PDF, JPG or PNG, up to 5 MB. A flagged document can be uploaded again.</p>
+      <div class="row">
+        <div>
+          <label for="docType">Document</label>
+          <select id="docType">
+            <option value="marksheet_10">10th marksheet</option>
+            <option value="marksheet_12">12th marksheet</option>
+            <option value="distance_certificate">Distance certificate</option>
+            <option value="category_certificate">Category certificate</option>
+          </select>
+        </div>
+        <div>
+          <label for="docFile">File</label>
+          <input id="docFile" type="file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png">
+        </div>
+        <div style="flex:0"><button id="uploadBtn">Upload</button></div>
+      </div>
+      <p id="docMsg" class="msg"></p>
+      <div class="wrap">
+        <table>
+          <thead><tr><th>Document</th><th>Status</th><th>Remark</th><th>Uploaded</th><th></th></tr></thead>
+          <tbody id="docRows"></tbody>
+        </table>
+      </div>
+    </section>
 
-        if (!name) {
-            window.location.replace("index.html");
-        } else {
-            document.getElementById("studentName").textContent = name;
-            document.getElementById("studentCapId").textContent =
-                sessionStorage.getItem("studentCapId");
-            document.getElementById("studentRank").textContent =
-                sessionStorage.getItem("studentStateRank");
+    <section class="card">
+      <h2>My group</h2>
+      <p id="roundInfo" class="muted"></p>
+      <p id="groupMsg" class="msg"></p>
+      <div id="groupArea"></div>
+    </section>
+  </main>
+
+  <script>
+    const API = "http://localhost:4000";
+    const KEY = "hostelPortalToken";
+    const token = sessionStorage.getItem(KEY);
+    if (!token) window.location.href = "student-login.html";
+
+    const DOC_LABELS = {
+      marksheet_10: "10th marksheet",
+      marksheet_12: "12th marksheet",
+      distance_certificate: "Distance certificate",
+      category_certificate: "Category certificate"
+    };
+
+    let me = null;
+    let roundId = null;
+    let vacantRooms = [];
+
+    const $ = (id) => document.getElementById(id);
+
+    function el(tag, props = {}, ...children) {
+      const e = document.createElement(tag);
+      Object.assign(e, props);
+      children.forEach((c) => e.append(c));
+      return e;
+    }
+
+    function say(id, text, ok) {
+      const node = $(id);
+      node.textContent = text;
+      node.className = "msg " + (ok ? "ok" : "err");
+    }
+
+    function logout() {
+      sessionStorage.removeItem(KEY);
+      window.location.href = "student-login.html";
+    }
+
+    async function api(path, options = {}) {
+      const isForm = options.body instanceof FormData;
+      const res = await fetch(API + path, {
+        ...options,
+        headers: {
+          ...(isForm ? {} : { "Content-Type": "application/json" }),
+          Authorization: "Bearer " + token,
+          ...(options.headers || {})
         }
-
-        document.getElementById("logoutButton").addEventListener("click", function () {
-            sessionStorage.clear();
-            window.location.href = "index.html";
-        });
-        
- 
-</script>
-
-<section id="studentProfile">
-  Loading your student profile...
-</section>
-
-<script>
-  const token = sessionStorage.getItem("hostelPortalToken");
-  const profile = document.getElementById("studentProfile");
-
-  if (!token) {
-    window.location.replace("student-login.html");
-  } else {
-    fetch("http://localhost:4000/me", {
-      headers: {
-        Authorization: `Bearer ${token}`
-      }
-    })
-      .then(async response => {
-        if (response.status === 401) {
-          sessionStorage.removeItem("hostelPortalToken");
-          window.location.replace("student-login.html");
-          return null;
-        }
-
-        if (!response.ok) {
-          throw new Error("Unable to load student profile.");
-        }
-
-        return response.json();
-      })
-      .then(student => {
-        if (!student) return;
-
-        profile.replaceChildren();
-
-        const heading = document.createElement("h2");
-        heading.textContent = "Welcome, " + (student.full_name || "Student");
-
-        const details = [
-          ["CAP ID", student.cap_id],
-          ["Roll Number", student.roll_no],
-          ["Email", student.email],
-          ["Branch", student.branch],
-          ["Category", student.category],
-          ["CGPA", student.cgpa]
-        ];
-
-        profile.appendChild(heading);
-
-        details.forEach(([label, value]) => {
-          const p = document.createElement("p");
-          p.textContent = `${label}: ${value ?? "Not available"}`;
-          profile.appendChild(p);
-        });
-      })
-      .catch(error => {
-        profile.textContent = error.message;
       });
-  }
-</script>
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 401) { logout(); throw new Error("Session expired."); }
+      if (!res.ok) throw new Error(data.error || "Request failed.");
+      return data;
+    }
 
+    /* ---------- Documents ---------- */
 
+    async function loadDocs() {
+      try {
+        const docs = await api("/documents");
+        const tbody = $("docRows");
+        tbody.replaceChildren();
+        if (!docs.length) {
+          tbody.append(el("tr", {}, el("td", { colSpan: 5, className: "muted", textContent: "No documents uploaded yet." })));
+          return;
+        }
+        docs.forEach((d) => {
+          const view = el("button", { className: "grey", textContent: "View" });
+          view.addEventListener("click", () => openDoc(d.id));
+          tbody.append(el("tr", {},
+            el("td", { textContent: DOC_LABELS[d.doc_type] || d.doc_type }),
+            el("td", {}, el("span", { className: "badge " + d.status, textContent: d.status })),
+            el("td", { textContent: d.remark || "" }),
+            el("td", { textContent: new Date(d.uploaded_at).toLocaleDateString() }),
+            el("td", {}, view)
+          ));
+        });
+      } catch (e) { say("docMsg", e.message, false); }
+    }
+
+    async function openDoc(id) {
+      try {
+        const d = await api("/documents/" + id + "/link");
+        window.open(d.url, "_blank", "noopener");
+      } catch (e) { say("docMsg", e.message, false); }
+    }
+
+    $("uploadBtn").addEventListener("click", async () => {
+      const file = $("docFile").files[0];
+      if (!file) return say("docMsg", "Choose a file first.", false);
+      if (file.size > 5 * 1024 * 1024) return say("docMsg", "File is larger than 5 MB.", false);
+
+      const form = new FormData();
+      form.append("doc_type", $("docType").value);
+      form.append("file", file);
+
+      $("uploadBtn").disabled = true;
+      say("docMsg", "Uploading...", true);
+      try {
+        await api("/documents", { method: "POST", body: form });
+        $("docFile").value = "";
+        say("docMsg", "Uploaded. The verifier will review it.", true);
+        loadDocs();
+      } catch (e) { say("docMsg", e.message, false); }
+      finally { $("uploadBtn").disabled = false; }
+    });
+
+    /* ---------- Groups ---------- */
+
+    function roomLabel(r) {
+      const parts = [r.room_no ?? r.id];
+      if (r.capacity != null) parts.push("capacity " + r.capacity);
+      if (r.floor != null) parts.push("floor " + r.floor);
+      return parts.join(" · ");
+    }
+
+    async function loadRound() {
+      try {
+        const rounds = await api("/rounds/open");
+        if (!rounds.length) {
+          roundId = null;
+          $("roundInfo").textContent = "No allotment round is open right now.";
+          $("groupArea").replaceChildren();
+          return;
+        }
+        roundId = rounds[0].id;
+        $("roundInfo").textContent = "Open round: #" + roundId;
+        try {
+          const v = await api("/rooms/vacant");
+          vacantRooms = Array.isArray(v) ? v : (v.rooms || []);
+        } catch { vacantRooms = []; }
+        loadGroups();
+      } catch (e) { say("groupMsg", e.message, false); }
+    }
+
+    async function loadGroups() {
+      const area = $("groupArea");
+      area.replaceChildren();
+      try {
+        const groups = await api("/groups/mine?round_id=" + roundId);
+        if (!groups.length) {
+          const b = el("button", { textContent: "Create a group (I will be the leader)" });
+          b.addEventListener("click", createGroup);
+          area.append(el("p", { className: "muted", textContent: "You are not in a group for this round." }), b);
+          return;
+        }
+        groups.forEach((g) => area.append(renderGroup(g)));
+      } catch (e) { say("groupMsg", e.message, false); }
+    }
+
+    async function createGroup() {
+      try {
+        await api("/groups", { method: "POST", body: JSON.stringify({ round_id: roundId }) });
+        say("groupMsg", "Group created.", true);
+        loadGroups();
+      } catch (e) { say("groupMsg", e.message, false); }
+    }
+
+    async function act(path, method, body, okText) {
+      try {
+        await api(path, { method, body: body ? JSON.stringify(body) : undefined });
+        say("groupMsg", okText, true);
+        loadGroups();
+      } catch (e) { say("groupMsg", e.message, false); }
+    }
+
+    function renderGroup(g) {
+      const box = el("div", { className: "group" });
+      const mine = g.members.find((m) => m.roll_no === me.roll_no);
+
+      box.append(el("h3", { textContent: g.is_leader ? "Your group (you are the leader)" : "Group" }));
+      if (g.locked_at) box.append(el("p", { className: "muted", textContent: "Preferences submitted. The group is locked." }));
+
+      // members
+      const table = el("table", {}, el("thead", {}, el("tr", {},
+        el("th", { textContent: "Roll no" }), el("th", { textContent: "Name" }), el("th", { textContent: "Status" }))));
+      const tb = el("tbody");
+      g.members.forEach((m) => tb.append(el("tr", {},
+        el("td", { textContent: m.roll_no }), el("td", { textContent: m.name }),
+        el("td", {}, el("span", { className: "badge " + m.state, textContent: m.state })))));
+      table.append(tb);
+      box.append(el("div", { className: "wrap" }, table));
+      const accepted = g.members.filter((m) => m.state === "accepted").length;
+      box.append(el("p", { className: "muted", textContent: accepted + " of 4 members accepted." }));
+
+      // invited to someone else's group
+      if (mine && mine.state === "invited") {
+        const yes = el("button", { className: "green", textContent: "Accept invite" });
+        const no = el("button", { className: "red", textContent: "Decline" });
+        yes.addEventListener("click", () => act("/groups/" + g.id + "/accept", "POST", null, "You joined the group."));
+        no.addEventListener("click", () => act("/groups/" + g.id + "/decline", "POST", null, "Invite declined."));
+        box.append(el("div", { className: "row" }, yes, no));
+        return box;
+      }
+
+      // leader tools
+      if (g.is_leader && !g.locked_at) {
+        const roll = el("input", { placeholder: "Roll number of the student", maxLength: 30 });
+        const inv = el("button", { textContent: "Invite" });
+        inv.addEventListener("click", () => {
+          if (!roll.value.trim()) return say("groupMsg", "Enter a roll number.", false);
+          act("/groups/" + g.id + "/invite", "POST", { roll_no: roll.value.trim() }, "Invite sent.");
+        });
+        box.append(el("h3", { textContent: "Invite a member" }), el("div", { className: "row" }, el("div", {}, roll), el("div", { style: "flex:0" }, inv)));
+        box.append(renderPrefs(g));
+      } else if (g.preferences.length) {
+        box.append(el("h3", { textContent: "Room preferences" }));
+        g.preferences.forEach((p) => box.append(el("div", { textContent: p.choice_no + ". Room " + p.room_no })));
+      }
+      return box;
+    }
+
+    function renderPrefs(g) {
+      const wrap = el("div");
+      wrap.append(el("h3", { textContent: "Room preferences (up to 5, in order)" }));
+      if (!vacantRooms.length) {
+        wrap.append(el("p", { className: "muted", textContent: "No vacant rooms to choose from yet." }));
+        return wrap;
+      }
+      const selects = [];
+      for (let i = 1; i <= 5; i++) {
+        const s = el("select");
+        s.append(el("option", { value: "", textContent: "Choice " + i + (i === 1 ? "" : " (optional)") }));
+        vacantRooms.forEach((r) => s.append(el("option", { value: String(r.id), textContent: roomLabel(r) })));
+        const cur = g.preferences.find((p) => p.choice_no === i);
+        if (cur) s.value = String(cur.room_id);
+        selects.push(s);
+        wrap.append(el("div", { style: "margin-top:8px" }, s));
+      }
+      const collect = () => selects.map((s) => s.value).filter(Boolean).map(Number);
+      const save = el("button", { className: "grey", textContent: "Save draft" });
+      const submit = el("button", { className: "green", textContent: "Submit and lock" });
+      save.addEventListener("click", () => {
+        const ids = collect();
+        if (!ids.length) return say("groupMsg", "Choose at least one room.", false);
+        act("/groups/" + g.id + "/preferences", "PUT", { room_ids: ids, submit: false }, "Draft saved.");
+      });
+      submit.addEventListener("click", () => {
+        const ids = collect();
+        if (!ids.length) return say("groupMsg", "Choose at least one room.", false);
+        if (!confirm("Submit and lock? You cannot change preferences afterwards.")) return;
+        act("/groups/" + g.id + "/preferences", "PUT", { room_ids: ids, submit: true }, "Preferences submitted.");
+      });
+      wrap.append(el("div", { className: "row", style: "margin-top:12px" }, save, submit));
+      return wrap;
+    }
+
+    /* ---------- Start ---------- */
+
+    $("logoutBtn").addEventListener("click", logout);
+
+    (async () => {
+      try {
+        me = await api("/me");
+        $("who").textContent = (me.full_name || me.email) + (me.cap_id ? " (" + me.cap_id + ")" : "");
+      } catch { return; }
+      loadDocs();
+      loadRound();
+    })();
+  </script>
 </body>
 </html>

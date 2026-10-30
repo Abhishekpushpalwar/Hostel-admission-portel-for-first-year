@@ -1,4 +1,4 @@
-```html
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -73,13 +73,16 @@
     </form>
 
     <form id="otpForm" class="hidden">
-      <label for="otp">6-digit email OTP</label>
+      <label for="otp">6-10 digit email OTP</label>
       <input id="otp" name="otp" required inputmode="numeric"
-             pattern="[0-9]{6}" maxlength="6" placeholder="Enter OTP">
+             pattern="[0-9]{6,10}" maxlength="10" placeholder="Enter OTP">
       <button id="verifyButton" type="submit">Verify OTP and Login</button>
       <button id="backButton" type="button"
               style="background:#64748b">Back</button>
     </form>
+    <p style="text-align:center;font-size:14px">
+  New student? <a href="register.html">Register here</a>
+</p>
 
     <p id="message" role="status" aria-live="polite"></p>
   </main>
@@ -169,4 +172,3 @@
   </script>
 </body>
 </html>
-```

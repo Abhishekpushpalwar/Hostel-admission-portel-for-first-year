@@ -140,5 +140,23 @@ router.post('/admin/documents/:id/flag', requireAuth, requireRole('verifier', 'a
     const { remark } = z.object({ remark: z.string().trim().min(1, 'A remark is required').max(500) }).parse(req.body);
     return review(req, res, 'flagged', remark);
   }));
+  // GET /admin/documents?status=pending|flagged|verified   (verifier, admin)
+router.get('/admin/documents', requireAuth, requireRole('verifier', 'admin'), wrap(async (req, res) => {
+  const { status } = z.object({
+    status: z.enum(['pending', 'flagged', 'verified']).default('pending'),
+  }).parse(req.query);
+
+  const { rows } = await query(
+    `select d.id, d.doc_type, d.status, d.remark, d.uploaded_at,
+            s.cap_id, s.full_name, s.roll_no
+       from documents d
+       join applications a on a.id = d.application_id
+       join students s on s.user_id = a.student_id
+      where a.academic_year = $1 and d.status = $2
+      order by d.uploaded_at`,
+    [config.academicYear, status]
+  );
+  res.json(rows);
+}));
 
 export default router;
